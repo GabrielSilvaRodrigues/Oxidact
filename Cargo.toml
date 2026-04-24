@@ -1,0 +1,17 @@
+[workspace]
+members = ["oxidact-core", "oxidact-macros"]
+
+[package]
+name = "oxidact_app"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+oxidact-core = { path = "./oxidact-core" }
+oxidact-macros = { path = "./oxidact-macros" }
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+wasm-bindgen = "0.2"
