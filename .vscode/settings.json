@@ -1,0 +1,10 @@
+{
+  "rust-analyzer.procMacro.enable": true,
+  "rust-analyzer.cargo.buildScripts.enable": true,
+  "rust-analyzer.cargo.allTargets": true,
+  "rust-analyzer.linkedProjects": [
+    "Cargo.toml",
+    "oxidact-core/Cargo.toml",
+    "oxidact-macros/Cargo.toml"
+  ]
+}

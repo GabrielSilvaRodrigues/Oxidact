@@ -1,37 +1,74 @@
-pub fn build_app() -> oxidact_core::VNode {
-    let mut root = oxidact_core::VNode::new(oxidact_core::NodeType::SafeAreaView);
-    root.style_raw = "flex: 1; bg: #111111".to_string();
+mod screens;
 
-    let mut container = oxidact_core::VNode::new(oxidact_core::NodeType::View);
-    container.style_raw = "padding: 20".to_string();
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Screen {
+    Login,
+    Cadastro,
+}
 
-    let mut title = oxidact_core::VNode::new(oxidact_core::NodeType::Text);
-    title.text_content = Some("Bem-vindo ao Oxidact (Web + Native)".to_string());
-
-    let mut section = oxidact_core::VNode::new(oxidact_core::NodeType::View);
-    section.style_raw = "margin-top: 50".to_string();
-
-    let mut email_label = oxidact_core::VNode::new(oxidact_core::NodeType::Text);
-    email_label.text_content = Some("Email:".to_string());
-
-    let mut button = oxidact_core::VNode::new(oxidact_core::NodeType::Pressable);
-    button.style_raw = "bg: #333; radius: 8".to_string();
-
-    let mut button_text = oxidact_core::VNode::new(oxidact_core::NodeType::Text);
-    button_text.text_content = Some("Clique para entrar".to_string());
-
-    button.children.push(button_text);
-    section.children.push(email_label);
-    section.children.push(button);
-    container.children.push(title);
-    container.children.push(section);
-    root.children.push(container);
-
-    root
+pub fn build_app(screen: Screen) -> oxidact_core::VNode {
+    match screen {
+        Screen::Login => screens::build_login_screen(),
+        Screen::Cadastro => screens::build_cadastro_screen(),
+    }
 }
 
 pub fn run_app() {
-    oxidact_core::run(build_app());
+    let screen = selected_screen();
+    let app = build_app(screen);
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        let tabs = web_tabs(screen);
+
+        oxidact_core::render_web_preview(
+            &app,
+            oxidact_core::WebPreviewOptions {
+                tabs: &tabs,
+                show_tree: true,
+            },
+        );
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let tree_text = oxidact_core::tree_text(&app);
+        println!("{tree_text}");
+        oxidact_core::run(app);
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_tabs(screen: Screen) -> [oxidact_core::WebPreviewTab<'static>; 2] {
+    [
+        oxidact_core::WebPreviewTab {
+            label: "Tela Login",
+            href: "?screen=login",
+            active: screen == Screen::Login,
+            active_color: "#2563eb",
+        },
+        oxidact_core::WebPreviewTab {
+            label: "Tela Cadastro",
+            href: "?screen=cadastro",
+            active: screen == Screen::Cadastro,
+            active_color: "#0ea5e9",
+        },
+    ]
+}
+
+fn selected_screen() -> Screen {
+    #[cfg(target_arch = "wasm32")]
+    {
+        if let Some(window) = web_sys::window() {
+            if let Ok(search) = window.location().search() {
+                if search.to_lowercase().contains("screen=cadastro") {
+                    return Screen::Cadastro;
+                }
+            }
+        }
+    }
+
+    Screen::Login
 }
 
 #[cfg(target_arch = "wasm32")]

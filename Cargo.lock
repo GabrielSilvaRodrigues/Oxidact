@@ -987,6 +987,7 @@ dependencies = [
  "oxidact-core",
  "oxidact-macros",
  "wasm-bindgen",
+ "web-sys",
 ]
 
 [[package]]

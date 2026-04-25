@@ -12,7 +12,7 @@ enum RsxItem {
 
 struct RsxElement {
     tag: Ident,
-    style: Option<LitStr>,
+    attributes: Vec<(Ident, LitStr)>,
     children: Vec<RsxItem>,
 }
 
@@ -21,15 +21,12 @@ impl Parse for RsxElement {
         input.parse::<Token![<]>()?;
         let tag: Ident = input.parse()?;
 
-        let mut style = None;
+        let mut attributes = Vec::new();
         while !input.peek(Token![>]) && !input.peek(Token![/]) {
             let attr: Ident = input.parse()?;
             input.parse::<Token![=]>()?;
             let value: LitStr = input.parse()?;
-
-            if attr == "style" {
-                style = Some(value);
-            }
+            attributes.push((attr, value));
         }
 
         if input.peek(Token![/]) {
@@ -37,7 +34,7 @@ impl Parse for RsxElement {
             input.parse::<Token![>]>()?;
             return Ok(RsxElement {
                 tag,
-                style,
+                attributes,
                 children: Vec::new(),
             });
         }
@@ -66,7 +63,7 @@ impl Parse for RsxElement {
 
         Ok(RsxElement {
             tag,
-            style,
+            attributes,
             children,
         })
     }
@@ -87,16 +84,31 @@ fn generate_node(item: &RsxItem) -> proc_macro2::TokenStream {
         RsxItem::Element(el) => {
             let tag_name = el.tag.to_string();
             let node_type = map_tag(&tag_name);
-            let style = match &el.style {
-                Some(s) => quote!(#s.to_string()),
-                None => quote!(String::new()),
-            };
+            let style = el
+                .attributes
+                .iter()
+                .find(|(name, _)| name == "style")
+                .map(|(_, value)| quote!(#value.to_string()))
+                .unwrap_or_else(|| quote!(String::new()));
+
+            let attrs = el
+                .attributes
+                .iter()
+                .filter(|(name, _)| name != "style")
+                .map(|(name, value)| {
+                    let key = name.to_string();
+                    quote! {
+                        node.set_attr(#key, #value.to_string());
+                    }
+                });
+
             let children = el.children.iter().map(generate_node);
 
             quote! {
                 {
                     let mut node = oxidact_core::VNode::new(#node_type);
                     node.style_raw = #style;
+                    #(#attrs)*
                     node.children = vec![#(#children),*];
                     node
                 }
