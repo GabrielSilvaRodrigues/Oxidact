@@ -1,5 +1,5 @@
 [workspace]
-members = ["oxidact-core", "oxidact-macros"]
+members = ["oxidact-core", "oxidact-macros", "oxidact-cli"]
 
 [package]
 name = "oxidact_app"

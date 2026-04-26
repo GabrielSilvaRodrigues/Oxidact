@@ -1,19 +1,35 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn::{
+    braced,
     parse::{Parse, ParseStream},
-    parse_macro_input, Ident, LitStr, Result, Token,
+    parse_macro_input, Expr, Ident, LitStr, Result, Token,
 };
 
 enum RsxItem {
     Element(RsxElement),
     Text(LitStr),
+    Expr(Expr),
 }
 
 struct RsxElement {
     tag: Ident,
-    attributes: Vec<(Ident, LitStr)>,
+    attributes: Vec<(Ident, AttrValue)>,
     children: Vec<RsxItem>,
+}
+
+enum AttrValue {
+    Literal(LitStr),
+    Expr(Expr),
+}
+
+impl AttrValue {
+    fn to_tokens(&self) -> proc_macro2::TokenStream {
+        match self {
+            AttrValue::Literal(lit) => quote!(#lit),
+            AttrValue::Expr(expr) => quote!((#expr)),
+        }
+    }
 }
 
 impl Parse for RsxElement {
@@ -25,7 +41,18 @@ impl Parse for RsxElement {
         while !input.peek(Token![>]) && !input.peek(Token![/]) {
             let attr: Ident = input.parse()?;
             input.parse::<Token![=]>()?;
-            let value: LitStr = input.parse()?;
+            let value = if input.peek(LitStr) {
+                AttrValue::Literal(input.parse()?)
+            } else if input.peek(syn::token::Brace) {
+                let content;
+                braced!(content in input);
+                AttrValue::Expr(content.parse()?)
+            } else {
+                return Err(syn::Error::new(
+                    input.span(),
+                    "atributo RSX deve ser string literal ou expressao entre chaves",
+                ));
+            };
             attributes.push((attr, value));
         }
 
@@ -45,6 +72,10 @@ impl Parse for RsxElement {
         while !(input.peek(Token![<]) && input.peek2(Token![/])) {
             if input.peek(LitStr) {
                 children.push(RsxItem::Text(input.parse()?));
+            } else if input.peek(syn::token::Brace) {
+                let content;
+                braced!(content in input);
+                children.push(RsxItem::Expr(content.parse()?));
             } else if input.peek(Token![<]) {
                 children.push(RsxItem::Element(input.parse()?));
             } else {
@@ -75,6 +106,9 @@ fn map_tag(tag: &str) -> proc_macro2::TokenStream {
         "TextInput" => quote!(oxidact_core::NodeType::TextInput),
         "Pressable" => quote!(oxidact_core::NodeType::Pressable),
         "SafeAreaView" => quote!(oxidact_core::NodeType::SafeAreaView),
+        "NavigationContainer" => quote!(oxidact_core::NodeType::NavigationContainer),
+        "StackNavigator" => quote!(oxidact_core::NodeType::StackNavigator),
+        "StackScreen" => quote!(oxidact_core::NodeType::StackScreen),
         _ => quote!(oxidact_core::NodeType::View),
     }
 }
@@ -88,7 +122,10 @@ fn generate_node(item: &RsxItem) -> proc_macro2::TokenStream {
                 .attributes
                 .iter()
                 .find(|(name, _)| name == "style")
-                .map(|(_, value)| quote!(#value.to_string()))
+                .map(|(_, value)| {
+                    let v = value.to_tokens();
+                    quote!((#v).to_string())
+                })
                 .unwrap_or_else(|| quote!(String::new()));
 
             let attrs = el
@@ -97,8 +134,9 @@ fn generate_node(item: &RsxItem) -> proc_macro2::TokenStream {
                 .filter(|(name, _)| name != "style")
                 .map(|(name, value)| {
                     let key = name.to_string();
+                    let v = value.to_tokens();
                     quote! {
-                        node.set_attr(#key, #value.to_string());
+                        node.set_attr(#key, (#v).to_string());
                     }
                 });
 
@@ -121,6 +159,11 @@ fn generate_node(item: &RsxItem) -> proc_macro2::TokenStream {
                     node.text_content = Some(#text.to_string());
                     node
                 }
+            }
+        }
+        RsxItem::Expr(expr) => {
+            quote! {
+                (#expr)
             }
         }
     }

@@ -1,33 +1,57 @@
+mod app;
+mod components;
+mod navigation;
 mod screens;
+mod styles;
+mod wasm_internal;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Screen {
-    Login,
-    Cadastro,
+pub use navigation::Screen;
+
+#[derive(Debug, Clone, Default)]
+pub struct LoginForm {
+    pub tentativas: i32,
+    pub email: String,
+    pub senha: String,
 }
 
-pub fn build_app(screen: Screen) -> oxidact_core::VNode {
-    match screen {
-        Screen::Login => screens::build_login_screen(),
-        Screen::Cadastro => screens::build_cadastro_screen(),
+#[derive(Debug, Clone, Default)]
+pub struct CadastroForm {
+    pub tentativas: i32,
+    pub nome: String,
+    pub email: String,
+    pub senha: String,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub fn get_login_form(tentativas: i32) -> LoginForm {
+    LoginForm {
+        tentativas,
+        email: oxidact_core::web_input_value("login_email").unwrap_or_default(),
+        senha: oxidact_core::web_input_value("login_password").unwrap_or_default(),
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+pub fn get_cadastro_form(tentativas: i32) -> CadastroForm {
+    CadastroForm {
+        tentativas,
+        nome: oxidact_core::web_input_value("signup_name").unwrap_or_default(),
+        email: oxidact_core::web_input_value("signup_email").unwrap_or_default(),
+        senha: oxidact_core::web_input_value("signup_password").unwrap_or_default(),
+    }
+}
+
+pub fn build_app(screen: Screen) -> oxidact_core::VNode {
+    app::build_app(screen)
+}
+
 pub fn run_app() {
-    let screen = selected_screen();
+    let screen = wasm_internal::get_selected_screen();
     let app = build_app(screen);
 
     #[cfg(target_arch = "wasm32")]
     {
-        let tabs = web_tabs(screen);
-
-        oxidact_core::render_web_preview(
-            &app,
-            oxidact_core::WebPreviewOptions {
-                tabs: &tabs,
-                show_tree: true,
-            },
-        );
+        wasm_internal::setup_web_preview(&app, screen);
     }
 
     #[cfg(not(target_arch = "wasm32"))]
@@ -36,43 +60,4 @@ pub fn run_app() {
         println!("{tree_text}");
         oxidact_core::run(app);
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-fn web_tabs(screen: Screen) -> [oxidact_core::WebPreviewTab<'static>; 2] {
-    [
-        oxidact_core::WebPreviewTab {
-            label: "Tela Login",
-            href: "?screen=login",
-            active: screen == Screen::Login,
-            active_color: "#2563eb",
-        },
-        oxidact_core::WebPreviewTab {
-            label: "Tela Cadastro",
-            href: "?screen=cadastro",
-            active: screen == Screen::Cadastro,
-            active_color: "#0ea5e9",
-        },
-    ]
-}
-
-fn selected_screen() -> Screen {
-    #[cfg(target_arch = "wasm32")]
-    {
-        if let Some(window) = web_sys::window() {
-            if let Ok(search) = window.location().search() {
-                if search.to_lowercase().contains("screen=cadastro") {
-                    return Screen::Cadastro;
-                }
-            }
-        }
-    }
-
-    Screen::Login
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen::prelude::wasm_bindgen(start)]
-pub fn wasm_start() {
-    run_app();
 }

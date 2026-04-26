@@ -11,4 +11,4 @@ pollster = "0.3" # Para rodar o async do WGPU no main
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2"
 wasm-bindgen-futures = "0.4"
-web-sys = { version = "0.3", features = ["Window", "Document", "HtmlCanvasElement", "Element", "Node", "HtmlElement", "console"] }
+web-sys = { version = "0.3", features = ["Window", "Location", "Document", "HtmlCanvasElement", "HtmlInputElement", "Element", "Node", "Event", "EventTarget", "HtmlElement", "console"] }
