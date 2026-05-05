@@ -51,4 +51,5 @@ pub fn route_name(screen: Screen) -> &'static str {
         Screen::Login => "Login",
         Screen::Cadastro => "Cadastro",
     }
+    Perfil,
 }
